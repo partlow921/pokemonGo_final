@@ -2,6 +2,8 @@ from pokemon import *
 from player import *
 from item import *
 import random
+import sqlite3
+import database
 
 
 """
