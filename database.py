@@ -4,59 +4,56 @@ from pokemon import *
 from move import *
 from item import *
 
-db_name='pokemonGo.db'
+db_name = "pokemonGo.db"
 
-def check_username_in_database(player_name):
-    conn = sqlite3.connect(db_name)
+def check_user_name(player.name):
+    conn = sqllite3.connect(db_name)
     c = conn.cursor()
-    c.execute("SELECT * FROM players WHERE player_name='"+player_name+"'")
+    c.execute("SELECT * FROM players WHERE player_name='"+player+name+"'")
     result = len(c.fetchall())>0
     conn.close()
-    
+
     return result
 
 def get_user_info(username):
     conn = sqlite3.connect(db_name)
     c = conn.cursor()
     c.execute("SELECT * FROM players WHERE player_name='"+username+"'")
-    player_name, password, level, experience= c.fetchone()
+    player_name, password, level, experience= c.fetchnone()
     conn.close()
-    
+
     return player_name, password, level, experience
 
 def sync_from_db(player):
     conn = sqlite3.connect(db_name)
     c = conn.cursor()
     
-    #syncing player's items
     c.execute("SELECT * from player_items WHERE player_name='"+player.username+"'")
     for row in c.fetchall():
         player_name, item_name, quantity = row
         for i in range(quantity):
             player.bag.sync_items_by_name(item_name)
             
-    #syncing player's pokemons
     c.execute("SELECT * from player_pokemon WHERE player_name='"+player.username+"'")
     for row in c.fetchall():
-        pokedex_id, player_name, fast_move_name, special_move_name, cp, hp, current_hp, weight, height, sex = row
-        c.execute("SELECT name,type_1, type_2, evolve_to, catch_chance from pokemon_meta WHERE pokedex_ID="+str(pokedex_id))        
-        pokemon_name, type1, type2, evolve_to, catch_chance=c.fetchone()
+        pokedex_id, player_name, move, move2, cp, hp, current_hp, weight, height, sex, pokemon_xp, gen_level = row
+        c.execute("SELECT name,type1, type2, evolve_to, catch_chance from pokemon_meta WHERE pokedex_ID="+str(pokedex_id))        
+        pokemon_name, type1, type2, evolve_to, evolution_lvl, catch_chance=c.fetchone()
         
-        c.execute("SELECT type,power,required_gauge from moves WHERE name='"+fast_move_name+"'")
-        type, power, gauge=c.fetchone()
-        fast_move=Move(fast_move_name,power,type, gauge)
+        c.execute("SELECT type,power from moves WHERE name='"+move_name+"'")
+        type, power =c.fetchone()
+        move=Move(move_name,power,type)
         
-        c.execute("SELECT type,power,required_gauge from moves WHERE name='"+special_move_name+"'")
-        type, power, gauge=c.fetchone()
-        special_move=Move(special_move_name, power, type, gauge)
+        c.execute("SELECT type,power from moves WHERE name='"+move2_name+"'")
+        type, power=c.fetchone()
+        move2=Move(move2_name, power, type)
         
         if(evolve_to=="None"):
-            pokemon=Pokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, fast_move, special_move, weight, height, sex, catch_chance)
+            pokemon=Pokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp)
         else:
-            pokemon=EvolvablePokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, fast_move, special_move, weight, height, sex, catch_chance, evolve_to)
+            pokemon=EvolvablePokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp, evolve_to, evolution_lvl)
         pokemon.current_hp=current_hp    
         player.pokemons_in_hand.append(pokemon)
-    #conn.commit()
     conn.close()
 
         
@@ -83,7 +80,6 @@ def update_player_item(player,item,quantity):
     item_record_count=c.fetchone()[0]
     
     if(item_record_count==0):
-        #print("INSERT INTO player_items VALUES ('"+player.username+"','"+item.name+"',"+str(quantity)+")")
         c.execute("INSERT INTO player_items VALUES ('"+player.username+"','"+item.name+"',"+str(quantity)+")")
     else:
         c.execute("SELECT quantity from player_items WHERE player_name='"+player.username+"' AND item_name='"+item.name+"'")
@@ -92,6 +88,28 @@ def update_player_item(player,item,quantity):
     conn.commit()
     conn.close()
 
+
+def insert_player_pokemon(player,pokemon):
+    conn = sqlite3.connect(db_name)
+    c = conn.cursor()
+    c.execute("INSERT INTO player_pokemon VALUES ('"+\
+              str(pokemon.pokedex_id)+"','"+\
+              player.username+"','"+\
+              pokemon.move.name+"','"+\
+              pokemon.move2.name+"',"+\
+              str(pokemon.cp)+","+\
+              str(pokemon.hp)+","+\
+              str(pokemon.current_hp)+","+\
+              str(pokemon.weight)+","+\
+              str(pokemon.height)+",'"+\
+              pokemon.sex+",'"+\
+              str(pokemon.pokemon_xp))+",'"+\
+              str(pokemon.pokemon_level)+"')")
+    conn.commit()
+    conn.close()
+
+"""
+#get_pokemon (random) handled with generate_pokemon in pokemon module versus using database. Could be rewritten here
 
 def get_pokemon(pokemon_name="Random"):
     conn = sqlite3.connect(db_name)
@@ -105,7 +123,7 @@ def get_pokemon(pokemon_name="Random"):
         seed=random.randint(1,num_of_rows)
         for row in result:
             if(i==seed):
-                pokedex_id,name,type1,type2,base_weight,base_height,evolve_to,catch_chance=row
+                pokedex_id, player_name, move, move2, cp, hp, current_hp, weight, height, sex, pokemon_xp, gen_level = row
             i+=1
     else:
         c.execute("SELECT * FROM pokemon_meta WHERE name='"+pokemon_name.title()+"'")
@@ -155,21 +173,4 @@ def get_pokemon(pokemon_name="Random"):
     conn.close()  
     
     return pokemon
-
-def insert_player_pokemon(player,pokemon):
-    conn = sqlite3.connect(db_name)
-    c = conn.cursor()
-    c.execute("INSERT INTO player_pokemon VALUES ('"+\
-              str(pokemon.pokedex_id)+"','"+\
-              player.username+"','"+\
-              pokemon.fast_move.name+"','"+\
-              pokemon.special_move.name+"',"+\
-              str(pokemon.cp)+","+\
-              str(pokemon.hp)+","+\
-              str(pokemon.current_hp)+","+\
-              str(pokemon.weight)+","+\
-              str(pokemon.height)+",'"+\
-              pokemon.sex+"')")
-    conn.commit()
-    conn.close()
-       
+"""
