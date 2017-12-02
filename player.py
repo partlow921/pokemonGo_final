@@ -1,5 +1,6 @@
 import string
 import random
+import database
 from item import *
 from pokemon import *
 
@@ -20,7 +21,6 @@ def validated(password_str):
             num_of_symbols+=1
         elif(char in string.digits):
             num_of_digits+=1
-        #Lowercase is valid character so needs check so not counted as unpermitted
         elif(char in string.ascii_lowercase):
             num_of_lowercase+=1
         else:
@@ -97,11 +97,24 @@ class Player(object):
             print("Your password has been updated")
 
     def level_up(self):
+        """
+        More advanced items are assigned as player increases in level.
+        A random number is also generated to give player potential to earn candy each time leveled up. Intended to make harder to get candy to level up Pokemon.
+        """
+        
         self.level+=1
-        new_items=[PokeBall("Poke Ball"), Potion("Potion"), RazzBerry("RazzBerry"),Revive("Revive")]
-        #Vary items selected based on user current level
+        special_check = random.uniform(0,1)
+        if (self.level<10):
+            new_items=[PokeBall("Poke Ball"), Potion("Potion"), RazzBerry("RazzBerry"),Revive("Revive")]
+        elif (self.level<20):
+            new_items=[PokeBall("Great Ball"), Potion("Super Potion"), RazzBerry("RazzBerry"),Revive("Revive")]
+        else:
+            new_items=[PokeBall("Ultra Ball"), Potion("Super Potion"), RazzBerry("Great RazzBerry"),Revive("Full Revive")]
         for i in range(0,5):
             self.bag.add_item(random.choice(new_items))
+
+        if special_check >= 0.85:
+            self.bag.add_item(Candy("Candy"))
     
     def increase_experience(self,amount):
         self.experience+=int(amount)
@@ -140,8 +153,8 @@ class Player(object):
         for pokemon in self.pokemon_in_hand:
             player_pokemon+="Level " + str(pokemon.pokemon_level) + " ("+str(pokemon.pokemon_xp) +") " + pokemon.name +\
                              " (HP: " + str(pokemon.current_hp) + "/" + str(pokemon.hp) +\
-                             ", CP: " + str(pokemon.cp) + ")\n"
-                            #Add detail for experience to next level.
+                             ", CP: " + str(pokemon.cp) + ")\n"\
+                             "Primary Move: "+ str(pokemon.move) + "\nSecondary Move: " + str(pokemon.move2) + "\n"
         print("Current Pokemon:\n" + player_pokemon + "\n")
         #Don't just print all, allow user to select one to see more details (print Pokemon)
 
@@ -198,23 +211,11 @@ class Player(object):
 
         battle_pokemon=generate_pokemon(self.level)
         self.encounter_pokemon(battle_pokemon)
-
-        #selection should be passed to seperate battle function, duplicating while loop from capture menu
-        pokemon_list=""
-        i=1
-    
-        for pokemon in self.pokemon_in_hand:
-            pokemon_list+=str(i)+":"+pokemon.name+" (Level: "+str(pokemon.pokemon_level)+\
-                           ", HP: "+str(pokemon.current_hp)+"/"+str(pokemon.hp)+", CP: "+str(pokemon.cp)+")\n"
-            i+=1
-    
-        pokemon_selection = int(input("Who will battle "+battle_pokemon.name+"?\n"+pokemon_list+"\n"))
-        #condition so selection HP can't be 0
+        pokemon_selection = self.select_pokemon(battle_pokemon)
         
         if(pokemon_selection!=0):
             pokemon1=self.pokemon_in_hand[pokemon_selection-1]
             print("You sent out " + pokemon1.name + "!\n")
-        #below should be set in new function
             
             battle_menu = "What will you do?\n 1. Attack\n 2. Use Item\n 3. Change Pokemon\n 4. Run\n"
             print(battle_menu)
@@ -223,8 +224,9 @@ class Player(object):
             while(selection!=0):
     
                 if(selection==1):
-            
-                    pokemon1.attack(pokemon1.move, battle_pokemon)
+
+                    battle_move=self.select_move(pokemon1)
+                    pokemon1.attack(battle_move, battle_pokemon)
                     
                     if battle_pokemon.current_hp > 0:
                         battle_pokemon.attack(battle_pokemon.move, pokemon1)
@@ -235,32 +237,80 @@ class Player(object):
                         self.encountering_pokemon.remove(battle_pokemon)
                         break
     
-                    if pokemon1.current_hp ==0:
-                        print(battle_pokemon.name + " has won the battle!\n")
-                        self.encountering_pokemon.remove(battle_pokemon)
-                        #allow for substitution of additional pokemon?
-                        break
+                    if pokemon1.current_hp == 0:
+
+                        hand_hp = 0
+                        for pokemon in self.pokemon_in_hand:
+                            hand_hp+=pokemon.current_hp
+                        if hand_hp == 0:
+                            print(battle_pokemon.name + " has won the battle!\n")
+                            self.encountering_pokemon.remove(battle_pokemon)
+                            break
+                        else:
+                            new_selection=self.select_pokemon(battle_pokemon)
+                            pokemon1=self.pokemon_in_hand[new_selection-1]
+                            print("You sent out " + pokemon1.name + "!\n")
     
                 elif(selection==2):
     
                     self.show_item_menu()
     
                 elif(selection==3):
-    
-                    new_selection=int(input("Currently in hand:\n" + pokemon_list + "\nWho will you send out?\n"))
+
+                    new_selection = self.select_pokemon(battle_pokemon)
                     pokemon1=self.pokemon_in_hand[new_selection-1]
                     print("You sent out " + pokemon1.name + "!\n")
 
                 elif(selection==4):
-                    print("You escaped!")
-                    #add probability check
-                    self.encountering_pokemon.remove(battle_pokemon)
-                    break
+                    escape_chance = battle_pokemon.pokemon_level/100
+                    attempt = random.uniform(0,1)
+                    #top range needs scaling or will pretty much always escape lower levels.
+                    if attempt >= escape_chance:
+                        print("You escaped!")
+                        self.encountering_pokemon.remove(battle_pokemon)
+                        break
+                    else:
+                        print("Escape failed!")
     
                 else:
                     print("Please select a valid option")
                 selection=int(input(battle_menu))
+                
+    def select_pokemon(self,battle_pokemon):
+
+        pokemon_list=""
+        i=1
     
+        for pokemon in self.pokemon_in_hand:
+            pokemon_list+=str(i)+":"+pokemon.name+" (Level: "+str(pokemon.pokemon_level)+\
+                           ", HP: "+str(pokemon.current_hp)+"/"+str(pokemon.hp)+", CP: "+str(pokemon.cp)+")\n"
+            i+=1
+    
+        pokemon_selection = int(input("Who will battle "+battle_pokemon.name+"?\n"+pokemon_list+"\n"))
+
+        hp_val = self.pokemon_in_hand[pokemon_selection-1]
+        while hp_val.current_hp == 0:
+              print("Pokemon can't be selected\n")
+              pokemon_selection = int(input("Who will battle "+battle_pokemon.name+"?\n"+pokemon_list+"\n"))
+              hp_val = self.pokemon_in_hand[pokemon_selection-1]
+              
+        return pokemon_selection
+
+    def select_move(self,pokemon):
+        move_list=""
+        move_selection=int(input("Select the move you want to use:\n1: "+str(pokemon.move) + "\n2: " + str(pokemon.move2) + "\n"))
+
+        while (move_selection !=0):
+            if (move_selection == 1):
+                battle_move = pokemon.move
+                break
+            elif (move_selection == 2):
+                battle_move = pokemon.move2
+                break
+            else:
+                print("Please select a move from the list")
+        return battle_move
+        
     #Define pokestop method, call Google Map API
 
 class Bag(object):
@@ -285,13 +335,35 @@ class Bag(object):
             self.item_dict[item.name]+=1
         else:
             self.item_dict[item.name]=1
-        #Add code to also add item to database, in additon to inventory
+
+       #database.update_player_item(self.owner,item,1)
+       #needs table to run
 
     def remove_item(self,item):
         if(item.name in self.item_dict.keys()):
             self.item_dict[item.name]-=1
             self.inventory.remove(item)
-        #Add code to update database, in addtion to inventory
-    
-        
-    #sync_items_by_name??
+        #dabatase.update_player_item(self.owner,item,-1)
+        #needs table to run
+
+    def sync_items_by_name(self,item_name,quantity=1):
+        item=Item()
+        for i in range(quantity):
+            if(item_name.find("Ball")!=-1):
+                item=PokeBall(item_name)
+            elif(item_name.find("Potion")!=-1):
+                item=Potion(item_name)
+            elif(item_name.find("Razz")!=-1):
+                item=RazzBerry(item_name)
+            elif(item_name.find("Revive")!=-1):
+                item=Revive(item_name)
+            elif(item_name.find("Candy")!=-1):
+                item=Candy(item_name)
+            
+            self.inventory.append(item)
+            
+            if (item.name in self.item_dict.keys()):
+                self.item_dict[item.name]+=1
+            else:
+                self.item_dict[item.name]=1
+                      
