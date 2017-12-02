@@ -6,7 +6,7 @@ from item import *
 
 db_name = "pokemonGo.db"
 
-def check_user_name(player.name):
+def check_user_name(player_name):
     conn = sqllite3.connect(db_name)
     c = conn.cursor()
     c.execute("SELECT * FROM players WHERE player_name='"+player+name+"'")
@@ -103,7 +103,7 @@ def insert_player_pokemon(player,pokemon):
               str(pokemon.weight)+","+\
               str(pokemon.height)+",'"+\
               pokemon.sex+",'"+\
-              str(pokemon.pokemon_xp))+",'"+\
+              str(pokemon.pokemon_xp)+",'"+\
               str(pokemon.pokemon_level)+"')")
     conn.commit()
     conn.close()
