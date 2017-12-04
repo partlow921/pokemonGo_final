@@ -4,7 +4,7 @@ from move import Move
 
 pokemon_entries={}
 
-pokedex_db=open("/Users/crowTrobot921/Desktop/PokemonGo_ProjectFiles/pokedex.csv","r", encoding="windows-1252")
+pokedex_db=open("pokedex.csv","r", encoding="windows-1252")
 #Encoding added to run on Mac
 pokedex_db.readline()
 for line in pokedex_db:
