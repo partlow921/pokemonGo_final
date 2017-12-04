@@ -1,8 +1,9 @@
 class Type(object):
-"""
-Initially implemented as a class but can be a function
-Will require updates elsewhere so leaving as is for now
-"""
+    
+    '''
+    tially implemented as a class but can be a function
+    Will require updates elsewhere so leaving as is for now
+    '''
 
     def __init__(self,pokemon_type = "", target_type=""):
         self.pokemon_type = pokemon_type
