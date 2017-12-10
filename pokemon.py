@@ -24,7 +24,6 @@ class Pokemon(object):
 
     def __init__(self, id_int=0, name='', hp_int=1, cp_int=1, type1='normal', type2='None', move=Move(), move2=Move(), weight=0.0, height=0.0, sex='Unknown', catch_chance=1.0, pokemon_level=0, pokemon_xp=0):
             if (hp_int<0 or cp_int<0):
-                #additional validations should be added, sef, weight/height
                 print("Values provided were not correct, default Pokemon instance has been created")
                 self.pokedex_id   = 0
                 self.name         = name
