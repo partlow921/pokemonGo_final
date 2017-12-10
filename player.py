@@ -52,8 +52,6 @@ def validated(password_str):
 
 class Player(object):
 
-    #Add doc string for Player
-
     EXPERIENCE_CAP_AT_LEVEL=range(0,100*1000,1000)
 
     def __init__(self, username_str="-",password_str="",experience_points=0,current_level=1):
@@ -64,7 +62,7 @@ class Player(object):
         self.__password=password_str
         self.experience=experience_points
         self.level=current_level
-        self.bag=Bag()
+        self.bag=Bag(self)
         self.pokemon_in_hand=[]
         self.encountering_pokemon=[]
 
@@ -132,7 +130,7 @@ class Player(object):
         i=1
         menu_str="Select a number to pick the item you want to use:\n"
         for item_name, quantity in self.bag.item_dict.items():
-            menu_str+=str(i)+":"+ item_name +" ("+str(quantity)+") "
+            menu_str+=str(i)+":"+ item_name +" ("+str(quantity)+")\n"
             
             item_option_table[i]=item_name
             i+=1
@@ -151,15 +149,16 @@ class Player(object):
     def show_pokemon_in_hand(self):
         player_pokemon=""
         for pokemon in self.pokemon_in_hand:
-            player_pokemon+="Level " + str(pokemon.pokemon_level) + " ("+str(pokemon.pokemon_xp) +") " + pokemon.name +\
+            player_pokemon+="Level " + str(pokemon.pokemon_level) + " (XP: "+str(pokemon.pokemon_xp) +") " + pokemon.name +\
                              " (HP: " + str(pokemon.current_hp) + "/" + str(pokemon.hp) +\
                              ", CP: " + str(pokemon.cp) + ")\n"\
-                             "Primary Move: "+ str(pokemon.move) + "\nSecondary Move: " + str(pokemon.move2) + "\n"
+                             "Primary Move: "+ str(pokemon.move) +" ("+pokemon.type1+")"+\
+                             "\nSecondary Move: " + str(pokemon.move2) +" ("+pokemon.type2+")\n"
         print("Current Pokemon:\n" + player_pokemon + "\n")
-        #Don't just print all, allow user to select one to see more details (print Pokemon)
 
     def encounter_pokemon(self,pokemon):
         self.encountering_pokemon.append(pokemon)
+        database.update_pokedex(pokemon)
         print("A wild level "+ str(pokemon.pokemon_level) + " " + pokemon.name +\
               " has appeared! ("+ str(pokemon.hp) + " HP, " + str(pokemon.cp) + " CP)\n")
 
@@ -179,7 +178,6 @@ class Player(object):
             item_menu_str+=str(i) + ":" + item_name + " (" + str(quantity) + ")\n"
             item_option_table[i] = item_name
             i+=1
-            #Restrict to Pokeballs
         item_menu_str += "0: Escape from Pokemon"
 
         if("Poke Ball" not in self.bag.item_dict.keys() and\
@@ -199,7 +197,6 @@ class Player(object):
             if(not item_found):
                 if(user_selection==0):
                     print("Escaping from", pokemon.name,".....Success!")
-                    #Add probability check
                     self.encountering_pokemon.remove(pokemon)
                 else:
                     print("There's no ", item_option_table[user_command], " left! Choose another item")
@@ -264,7 +261,6 @@ class Player(object):
                 elif(selection==4):
                     escape_chance = battle_pokemon.pokemon_level/100
                     attempt = random.uniform(0,1)
-                    #top range needs scaling or will pretty much always escape lower levels.
                     if attempt >= escape_chance:
                         print("You escaped!")
                         self.encountering_pokemon.remove(battle_pokemon)
@@ -311,16 +307,14 @@ class Player(object):
                 print("Please select a move from the list")
         return battle_move
         
-    #Define pokestop method, call Google Map API
 
 class Bag(object):
 
-    #Add doc stream
 
-    def __init__(self):
+    def __init__(self, owner):
         self.inventory=[]
         self.item_dict={}
-        #Add owner attribute
+        self.owner = owner
 
     def __str__(self):
         current_inv_str=""
@@ -335,16 +329,13 @@ class Bag(object):
             self.item_dict[item.name]+=1
         else:
             self.item_dict[item.name]=1
-
-       #database.update_player_item(self.owner,item,1)
-       #needs table to run
+        database.update_player_item(self.owner,item,1)
 
     def remove_item(self,item):
         if(item.name in self.item_dict.keys()):
             self.item_dict[item.name]-=1
             self.inventory.remove(item)
-        #dabatase.update_player_item(self.owner,item,-1)
-        #needs table to run
+        database.update_player_item(self.owner,item,-1)
 
     def sync_items_by_name(self,item_name,quantity=1):
         item=Item()
@@ -367,3 +358,4 @@ class Bag(object):
             else:
                 self.item_dict[item.name]=1
                       
+
