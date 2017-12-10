@@ -7,9 +7,9 @@ from item import *
 db_name = "pokemonGo.db"
 
 def check_user_name(player_name):
-    conn = sqllite3.connect(db_name)
+    conn = sqlite3.connect(db_name)
     c = conn.cursor()
-    c.execute("SELECT * FROM players WHERE player_name='"+player+name+"'")
+    c.execute("SELECT * FROM players WHERE player_name='"+player_name+"'")
     result = len(c.fetchall())>0
     conn.close()
 
@@ -19,7 +19,7 @@ def get_user_info(username):
     conn = sqlite3.connect(db_name)
     c = conn.cursor()
     c.execute("SELECT * FROM players WHERE player_name='"+username+"'")
-    player_name, password, level, experience= c.fetchnone()
+    player_name, password, level, experience= c.fetchone()
     conn.close()
 
     return player_name, password, level, experience
@@ -36,24 +36,18 @@ def sync_from_db(player):
             
     c.execute("SELECT * from player_pokemon WHERE player_name='"+player.username+"'")
     for row in c.fetchall():
-        pokedex_id, player_name, move, move2, cp, hp, current_hp, weight, height, sex, pokemon_xp, gen_level = row
-        c.execute("SELECT name,type1, type2, evolve_to, catch_chance from pokemon_meta WHERE pokedex_ID="+str(pokedex_id))        
-        pokemon_name, type1, type2, evolve_to, evolution_lvl, catch_chance=c.fetchone()
-        
-        c.execute("SELECT type,power from moves WHERE name='"+move_name+"'")
-        type, power =c.fetchone()
-        move=Move(move_name,power,type)
-        
-        c.execute("SELECT type,power from moves WHERE name='"+move2_name+"'")
-        type, power=c.fetchone()
-        move2=Move(move2_name, power, type)
+        pokedex_id, player_name, cp, hp, current_hp, weight, height, sex, pokemon_xp, gen_level = row
+        c.execute("SELECT name,type1, type2, move, move_power, move2, move2_power, evolve_to, evolve_lvl, catch_chance FROM pokemon_meta WHERE pokedex_ID="+str(pokedex_id))        
+        name, type1, type2, move, move_power, move2, move2_power, evolve_to, evolve_lvl, catch_chance=c.fetchone()
+        move=Move(move,move_power,type1)
+        move2=Move(move2,move2_power,type2)
         
         if(evolve_to=="None"):
-            pokemon=Pokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp)
+            pokemon=Pokemon(pokedex_id,name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp)
         else:
-            pokemon=EvolvablePokemon(pokedex_id,pokemon_name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp, evolve_to, evolution_lvl)
+            pokemon=EvolvablePokemon(pokedex_id,name,hp,cp, type1, type2, move, move2, weight, height, sex, catch_chance, gen_level, pokemon_xp, evolve_to, evolve_lvl)
         pokemon.current_hp=current_hp    
-        player.pokemons_in_hand.append(pokemon)
+        player.pokemon_in_hand.append(pokemon)
     conn.close()
 
         
@@ -68,7 +62,13 @@ def create_new_player(player):
 def save_progress(player):
     conn = sqlite3.connect(db_name)
     c = conn.cursor()
-    c.execute("UPDATE players SET password='"+player.get_password()+"',level="+str(player.level)+",experience="+str(player.experience)+" WHERE player_name='"+player.username+"'")
+    c.execute("UPDATE players SET password='"+player.get_password()+"',level="+str(player.level)+",experience="+str(player.experience)+\
+              " WHERE player_name='"+player.username+"'")
+    for pokemon in player.pokemon_in_hand:
+        c.execute("UPDATE player_pokemon SET cp="+str(pokemon.cp)+",hp="+str(pokemon.hp)+\
+                  ",current_hp="+str(pokemon.current_hp)+",weight="+str(pokemon.weight)+",height="+str(pokemon.height)+\
+                  ",pokemon_xp="+str(pokemon.pokemon_xp)+",pokemon_level="+str(pokemon.pokemon_level)+\
+                  " WHERE player_name='"+player.username+"' AND pokedex_ID="+str(pokemon.pokedex_id))
     print("Your player info has been successfully saved into database.\n")
     conn.commit()
     conn.close()
@@ -88,89 +88,54 @@ def update_player_item(player,item,quantity):
     conn.commit()
     conn.close()
 
+def update_pokedex(pokemon):
+    conn = sqlite3.connect(db_name)
+    c = conn.cursor()
+    c.execute("SELECT * FROM pokemon_meta WHERE pokedex_ID="+str(pokemon.pokedex_id))
+    result = len(c.fetchall())==0
+    evolution = pokemon.is_evolvable()
+    if(result):
+        if(evolution):
+            c.execute("INSERT INTO pokemon_meta VALUES ('"+\
+                      str(pokemon.pokedex_id)+"','"+\
+                      pokemon.name+"','"+\
+                      pokemon.type1+"','"+\
+                      pokemon.type2+"','"+\
+                      pokemon.move.name+"',"+\
+                      str(pokemon.move.power)+",'"+\
+                      pokemon.move2.name+"',"+\
+                      str(pokemon.move2.power)+",'"+\
+                      pokemon.evolve_to+"',"+\
+                      str(pokemon.evolution_lvl)+","+\
+                      str(pokemon.catch_chance)+")")
+        else:
+            c.execute("INSERT INTO pokemon_meta VALUES ('"+\
+                      str(pokemon.pokedex_id)+"','"+\
+                      pokemon.name+"','"+\
+                      pokemon.type1+"','"+\
+                      pokemon.type2+"','"+\
+                      pokemon.move.name+"',"+\
+                      str(pokemon.move.power)+",'"+\
+                      pokemon.move2.name+"',"+\
+                      str(pokemon.move2.power)+",'None',0,"+\
+                      str(pokemon.catch_chance)+")")                  
+    conn.commit()
+    conn.close()
 
 def insert_player_pokemon(player,pokemon):
     conn = sqlite3.connect(db_name)
     c = conn.cursor()
     c.execute("INSERT INTO player_pokemon VALUES ('"+\
               str(pokemon.pokedex_id)+"','"+\
-              player.username+"','"+\
-              pokemon.move.name+"','"+\
-              pokemon.move2.name+"',"+\
+              player.username+"',"+\
               str(pokemon.cp)+","+\
               str(pokemon.hp)+","+\
               str(pokemon.current_hp)+","+\
               str(pokemon.weight)+","+\
               str(pokemon.height)+",'"+\
-              pokemon.sex+",'"+\
-              str(pokemon.pokemon_xp)+",'"+\
-              str(pokemon.pokemon_level)+"')")
+              pokemon.sex+"',"+\
+              str(pokemon.pokemon_xp)+","+\
+              str(pokemon.pokemon_level)+")")
     conn.commit()
     conn.close()
 
-"""
-#get_pokemon (random) handled with generate_pokemon in pokemon module versus using database. Could be rewritten here
-
-def get_pokemon(pokemon_name="Random"):
-    conn = sqlite3.connect(db_name)
-    c = conn.cursor()
-    POKEMON_FOUND=True
-    if(pokemon_name=="Random"):
-        c.execute("SELECT * FROM pokemon_meta")
-        i=1
-        result=c.fetchall()
-        num_of_rows=int(len(result))
-        seed=random.randint(1,num_of_rows)
-        for row in result:
-            if(i==seed):
-                pokedex_id, player_name, move, move2, cp, hp, current_hp, weight, height, sex, pokemon_xp, gen_level = row
-            i+=1
-    else:
-        c.execute("SELECT * FROM pokemon_meta WHERE name='"+pokemon_name.title()+"'")
-        result=c.fetchall()
-        if(len(result)>0):
-            pokedex_id,name,type1,type2,base_weight,base_height,evolve_to,catch_chance=result
-        else:
-            POKEMON_FOUND=False
-    
-    if(POKEMON_FOUND):
-        # Randomizing fast move:
-        c.execute("SELECT name,power,type, required_gauge FROM moves, pokemon_moves WHERE pokedex_ID="+str(pokedex_id)+" AND required_gauge=0 AND moves.move_id=pokemon_moves.move_id")
-        i=1
-        result=c.fetchall()
-        num_of_rows=int(len(result))
-        seed=random.randint(1,num_of_rows)
-        for row in result:
-            if(i==seed):
-                move_name,power,type,gauge=row
-                fast_move=Move(move_name,power,type,gauge)
-            i+=1
-            
-        # Randomizing special move:
-        c.execute("SELECT name,power,type, required_gauge FROM moves, pokemon_moves WHERE pokedex_ID="+str(pokedex_id)+" AND required_gauge>0 AND moves.move_id=pokemon_moves.move_id")
-        i=1
-        result=c.fetchall()
-        num_of_rows=int(len(result))
-        seed=random.randint(1,num_of_rows)
-        for row in result:
-            if(i==seed):
-                move_name,power,type,gauge=row
-                special_move=Move(move_name,power,type,gauge)
-            i+=1
-        
-        #Randomize weight and height
-        weight=round(base_weight*(1+0.5*random.uniform(-1,1)),2)
-        height=round(base_height*(1+0.5*random.uniform(-1,1)),2)
-        
-        if(evolve_to=="None"):
-            pokemon=Pokemon(pokedex_id,name,0,1,type1,type2,fast_move,special_move,weight,height,"Unknown",float(catch_chance))
-        else:
-            pokemon=EvolvablePokemon(pokedex_id,name,0,1,type1,type2,fast_move,special_move,weight,height,"Unknown", float(catch_chance), evolve_to)
-        pokemon.randomize_status()
-    else:
-        pokemon=Pokemon()
-    conn.commit()
-    conn.close()  
-    
-    return pokemon
-"""
