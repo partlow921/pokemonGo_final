@@ -3,8 +3,6 @@ import database
 
 class Item(object):
 
-    #Add doc string
-
     def __init__(self, name_str="-"):
         self.name=name_str
 
@@ -31,7 +29,6 @@ class Potion(Item):
             self.restore_amount=200
         elif(self.name == "Max Potion"):
             self.restore_amount=500
-            #needs to set current to pokemon hp total, full restore
         else:
             self.restore_amount=0
 
@@ -101,7 +98,6 @@ class PokeBall(Item):
 
     def invoke(self,player):
         pokemon = player.encountering_pokemon[0]
-        #needs error handling if selected outside capture module.
         print("~~~~~~~~~~~~~~0~~~~~~~~~~~~~~~~")
         cap_chance = (pokemon.pokemon_level + 55)/100
         if cap_chance>1:
@@ -111,8 +107,7 @@ class PokeBall(Item):
             print(pokemon.name + " has bee captured!")
             player.pokemon_in_hand.append(pokemon)
             player.increase_experience(pokemon.pokemon_level*10)
-            #database.insert_player_pokemon(player,pokemon)
-            #tables need to be created for above
+            database.insert_player_pokemon(player,pokemon)
             player.encountering_pokemon.remove(pokemon)
         else:
             print("It failed! "+pokemon.name+" could not be caught\n")
@@ -164,5 +159,3 @@ class Candy(Item):
             pokemon=player.pokemon_in_hand[user_item_selected-1]
             pokemon.pokemon_increase_experience(self.xp_modifier)
             self.remove_item_from(player)
-
-#Stardust for CP
